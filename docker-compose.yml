@@ -1,17 +1,14 @@
 # ============================================
-# PRISM ONE — Stack para Portainer + Traefik
+# PRISM ONE — Stack para Portainer
 # ============================================
 #
 # Deploy via Portainer:
-#   1. Stacks → Add Stack
-#   2. Cole este YAML ou faça upload
-#   3. Preencha as variáveis de ambiente
-#   4. Deploy
+#   1. Stacks → Add Stack → Repository
+#   2. Repository URL: https://github.com/krivobr/prism-one.git
+#   3. Preencha as variáveis de ambiente abaixo
+#   4. Deploy the stack
 #
-# IMPORTANTE: Ajuste os valores abaixo:
-#   - DOMINIO: seu subdomínio (ex: prismone.empresa.com.br)
-#   - REDE_TRAEFIK: nome da rede Docker do Traefik (verificar com: docker network ls)
-#   - Variáveis de ambiente no .env ou direto no Portainer
+# Acesso: http://IP-DA-VPS:3001
 # ============================================
 
 services:
@@ -21,43 +18,17 @@ services:
       dockerfile: Dockerfile
     container_name: prism-one
     restart: unless-stopped
-    env_file:
-      - .env
+    ports:
+      - "3001:3000"
     environment:
       - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - AUTH_SECRET=${AUTH_SECRET}
     volumes:
       - uploads:/app/public/uploads
-    labels:
-      # === Traefik ===
-      - "traefik.enable=true"
-
-      # Rota HTTP → redireciona para HTTPS
-      - "traefik.http.routers.prismone-http.rule=Host(`${DOMINIO:-prismone.localhost}`)"
-      - "traefik.http.routers.prismone-http.entrypoints=web"
-      - "traefik.http.routers.prismone-http.middlewares=redirect-to-https@docker"
-
-      # Rota HTTPS
-      - "traefik.http.routers.prismone.rule=Host(`${DOMINIO:-prismone.localhost}`)"
-      - "traefik.http.routers.prismone.entrypoints=websecure"
-      - "traefik.http.routers.prismone.tls=true"
-      - "traefik.http.routers.prismone.tls.certresolver=letsencrypt"
-
-      # Porta do container
-      - "traefik.http.services.prismone.loadbalancer.server.port=3000"
-
-      # Middleware redirect HTTP→HTTPS
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
-    networks:
-      - traefik
 
 volumes:
   uploads:
     driver: local
-
-networks:
-  traefik:
-    external: true
-    # Se a rede do Traefik tiver outro nome, altere aqui.
-    # Verifique com: docker network ls
-    # Exemplos comuns: traefik, proxy, web, traefik_default
