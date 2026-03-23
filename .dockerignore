@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+*.md
+.env
+.env.local
+npm-debug.log*
+.vscode
+.idea
+scripts/
+*.mdb
+_access_data.json

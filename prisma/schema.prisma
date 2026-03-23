@@ -1,0 +1,695 @@
+// Schema do PRISM ONE - Sistema de Gestão de Instrumentação Industrial
+// Todas as tabelas e campos em português (pt-br)
+// Prefixo PO_ (PRISM ONE) em todas as tabelas
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ============================================================
+// INFRAESTRUTURA: Multi-Tenant + Autenticação
+// ============================================================
+
+/// Empresa/tenant do sistema SaaS
+model PO_Empresa {
+  id            Int      @id @default(autoincrement()) /// Identificador único da empresa
+  nome          String   @db.VarChar(200) /// Razão social ou nome fantasia
+  slug          String   @unique @db.VarChar(100) /// Slug para URL (ex: "votorantim-sossego")
+  cnpj          String?  @db.VarChar(18) /// CNPJ da empresa
+  plano         String   @default("basico") @db.VarChar(30) /// Plano contratado (basico, pro, enterprise)
+  ativo         Boolean  @default(true) /// Se a empresa está ativa no sistema
+  criado_em     DateTime @default(now()) /// Data de criação do registro
+  atualizado_em DateTime @updatedAt /// Data da última atualização
+
+  usuarios      PO_Usuario[]
+  equipamentos  PO_Equipamento[]
+  inspecoes     PO_Inspecao[]
+  calibracoes   PO_Calibracao[]
+  ordens        PO_OrdemServico[]
+  kpis          PO_KpiMensal[]
+  tipos         PO_Tipo[]
+  causas        PO_Causa[]
+  executantes   PO_Executante[]
+  areas         PO_Area[]
+  processos     PO_Processo[]
+  familias      PO_Familia[]
+  fabricantes   PO_Fabricante[]
+  conexoes      PO_Conexao[]
+  sinais_entrada PO_SinalEntrada[]
+  sinais_saida  PO_SinalSaida[]
+  alimentacoes  PO_Alimentacao[]
+  materiais     PO_Material[]
+  protocolos    PO_Protocolo[]
+  posicoes_dreno PO_PosicaoDreno[]
+  tipos_ajuste_remoto PO_TipoAjusteRemoto[]
+  tipos_indicador_local PO_TipoIndicadorLocal[]
+  tipos_ajuste_local PO_TipoAjusteLocal[]
+  tipos_cabecote PO_TipoCabecote[]
+  tipos_elemento_sensor PO_TipoElementoSensor[]
+  tipos_valvula PO_TipoValvula[]
+  tipos_atuador PO_TipoAtuador[]
+  periodos      PO_Periodo[]
+  fluxogramas   PO_Fluxograma[]
+  fotos         PO_Foto[]
+
+  @@map("po_empresa")
+}
+
+/// Usuários do sistema com papel/perfil
+model PO_Usuario {
+  id            Int       @id @default(autoincrement()) /// Identificador único do usuário
+  id_empresa    Int /// Empresa à qual o usuário pertence
+  nome          String    @db.VarChar(200) /// Nome completo do usuário
+  email         String    @unique @db.VarChar(200) /// Email para login
+  senha         String    @db.VarChar(255) /// Hash bcrypt da senha
+  papel         String    @default("tecnico") @db.VarChar(30) /// Papel: super_admin, admin, gestor, tecnico, visualizador
+  ativo         Boolean   @default(true) /// Se o usuário está ativo
+  ultimo_acesso DateTime? /// Data/hora do último login
+  criado_em     DateTime  @default(now())
+  atualizado_em DateTime  @updatedAt
+
+  empresa       PO_Empresa @relation(fields: [id_empresa], references: [id])
+
+  @@index([id_empresa])
+  @@map("po_usuario")
+}
+
+// ============================================================
+// TABELAS DE DOMÍNIO (ex "Cadastro de opções")
+// Cada coluna da tabela Access vira uma tabela independente
+// ============================================================
+
+/// Tipos de manutenção/intervenção (ex: Calibração, Corretiva, Preventiva)
+model PO_Tipo {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int /// Empresa dona do registro
+  nome       String  @db.VarChar(100) /// Nome do tipo
+  ativo      Boolean @default(true) /// Se está ativo
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  ordens     PO_OrdemServico[]
+
+  @@index([id_empresa])
+  @@map("po_tipo")
+}
+
+/// Causas de intervenção (ex: Desgaste normal, Área agressiva)
+model PO_Causa {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100) /// Nome da causa
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  ordens     PO_OrdemServico[]
+
+  @@index([id_empresa])
+  @@map("po_causa")
+}
+
+/// Executantes/técnicos responsáveis
+model PO_Executante {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(200) /// Nome do executante
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  inspecoes  PO_Inspecao[]
+  calibracoes PO_Calibracao[]
+  ordens     PO_OrdemServico[]
+
+  @@index([id_empresa])
+  @@map("po_executante")
+}
+
+/// Áreas da planta industrial (ex: Aciaria, Altos Fornos)
+model PO_Area {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100) /// Nome da área
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_area")
+}
+
+/// Processos industriais (ex: AF1, EOF, ETA)
+model PO_Processo {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100) /// Nome do processo
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_processo")
+}
+
+/// Famílias de instrumentos (ex: Transmissores, Atuadores)
+model PO_Familia {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100) /// Nome da família
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_familia")
+}
+
+/// Fabricantes de instrumentos (ex: Smar, Yokogawa, Emerson)
+model PO_Fabricante {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100) /// Nome do fabricante
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_fabricante")
+}
+
+/// Tipos de conexão ao processo (ex: 1/4" NPT, 1/2" BSP)
+model PO_Conexao {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100) /// Descrição da conexão
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_conexao")
+}
+
+/// Sinais de entrada (ex: 4 a 20 mA, 0 a 10 Vcc)
+model PO_SinalEntrada {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100) /// Descrição do sinal
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_sinal_entrada")
+}
+
+/// Sinais de saída (ex: 4 a 20 mA, 0 a 10 Vcc)
+model PO_SinalSaida {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_sinal_saida")
+}
+
+/// Tipos de alimentação elétrica (ex: 24 Vcc, 220 Vac)
+model PO_Alimentacao {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_alimentacao")
+}
+
+/// Materiais (ex: Inox 316, Monel, Aço carbono)
+model PO_Material {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+
+  @@index([id_empresa])
+  @@map("po_material")
+}
+
+/// Protocolos de comunicação (ex: HART, Modbus, Fieldbus)
+model PO_Protocolo {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_protocolo")
+}
+
+/// Posição dos drenos (Superior, Inferior, Não instalado)
+model PO_PosicaoDreno {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_posicao_dreno")
+}
+
+/// Tipo de ajuste remoto
+model PO_TipoAjusteRemoto {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_tipo_ajuste_remoto")
+}
+
+/// Tipo de indicador local (Digital, Analógico, Não instalado)
+model PO_TipoIndicadorLocal {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_tipo_indicador_local")
+}
+
+/// Tipo de ajuste local de zero e span
+model PO_TipoAjusteLocal {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_tipo_ajuste_local")
+}
+
+/// Tipo de cabeçote
+model PO_TipoCabecote {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(200)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_tipo_cabecote")
+}
+
+/// Tipo do elemento sensor (Tipo "J", "K", PT100, Capacitivo, etc.)
+model PO_TipoElementoSensor {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_tipo_elemento_sensor")
+}
+
+/// Tipo de válvula (Globo, Borboleta)
+model PO_TipoValvula {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(100)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_tipo_valvula")
+}
+
+/// Tipo de atuador
+model PO_TipoAtuador {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  nome       String  @db.VarChar(200)
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+  equipamentos PO_Equipamento[]
+
+  @@index([id_empresa])
+  @@map("po_tipo_atuador")
+}
+
+/// Períodos de calibração em dias
+model PO_Periodo {
+  id         Int     @id @default(autoincrement())
+  id_empresa Int
+  dias       Int /// Período em dias
+  descricao  String  @db.VarChar(50) /// Ex: "30 dias", "90 dias"
+  ativo      Boolean @default(true)
+
+  empresa    PO_Empresa @relation(fields: [id_empresa], references: [id])
+
+  @@index([id_empresa])
+  @@map("po_periodo")
+}
+
+// ============================================================
+// TABELAS DE NEGÓCIO
+// ============================================================
+
+/// Equipamento/instrumento cadastrado (ex-tabela TAG do Access)
+model PO_Equipamento {
+  id                       Int      @id @default(autoincrement()) /// ID único do equipamento
+  id_empresa               Int /// Empresa dona
+  tag                      String   @db.VarChar(50) /// TAG do instrumento (ex: FT-1100A)
+  descricao                String?  @db.VarChar(300) /// Descrição do equipamento
+  id_fabricante            Int? /// FK para PO_Fabricante
+  modelo                   String?  @db.VarChar(100) /// Modelo do equipamento
+  serie                    String?  @db.VarChar(100) /// Número de série
+  id_area                  Int? /// FK para PO_Area
+  id_familia               Int? /// FK para PO_Familia
+  id_processo              Int? /// FK para PO_Processo
+  funcao                   String?  @db.VarChar(300) /// Função no processo
+  equipamento_processo     String?  @db.VarChar(100) /// Equipamento associado no processo
+  alcance                  String?  @db.VarChar(100) /// Range de medição
+  faixa                    String?  @db.VarChar(100) /// Faixa de trabalho
+  id_sinal_entrada         Int? /// FK para PO_SinalEntrada
+  id_sinal_saida           Int? /// FK para PO_SinalSaida
+  id_protocolo             Int? /// FK para PO_Protocolo
+  id_alimentacao           Int? /// FK para PO_Alimentacao
+  id_conexao               Int? /// FK para PO_Conexao
+  sistema_seguranca        Boolean  @default(false) /// Se é instrumento de segurança
+  pendencias               Boolean  @default(false) /// Se há pendências abertas
+  icd                      Int? /// Índice de Criticidade do Dispositivo
+  periodo_calibracao       Int? /// Período de calibração em dias
+  ultima_calibracao        DateTime? /// Data da última calibração
+  proxima_calibracao       DateTime? /// Data da próxima calibração
+  observacoes              String?  @db.Text /// Observações gerais
+  status                   String   @default("ativo") @db.VarChar(20) /// ativo, inativo, em_manutencao
+
+  // --- Dados técnicos: Válvulas/Atuadores ---
+  id_tipo_valvula          Int?
+  id_tipo_atuador          Int?
+  classe_valvula           String?  @db.VarChar(50) /// Classe da válvula (150 Lbs)
+  cv                       String?  @db.VarChar(50) /// Coeficiente de vazão
+  curso                    String?  @db.VarChar(50) /// Curso do atuador
+  diametro_nominal         String?  @db.VarChar(50) /// Diâmetro nominal
+  material_corpo           String?  @db.VarChar(100) /// Material do corpo
+  material_internos        String?  @db.VarChar(100) /// Material dos internos
+  material_gaxetas         String?  @db.VarChar(100) /// Material das gaxetas
+  estanqueidade            String?  @db.VarChar(100) /// Classe de estanqueidade
+  acao                     String?  @db.VarChar(100) /// Ar para abrir, Ar para fechar
+  tempo_atuacao            String?  @db.VarChar(50) /// Tempo de atuação
+  pressao_trabalho         String?  @db.VarChar(50) /// Pressão de trabalho
+  angulo_giro              String?  @db.VarChar(50) /// Ângulo de giro
+  diametro_cilindro        String?  @db.VarChar(50) /// Diâmetro interno do cilindro
+  comprimento_haste        String?  @db.VarChar(50) /// Comprimento da haste
+  tipo_oleo_redutor        String?  @db.VarChar(100) /// Tipo de óleo do redutor
+  tipo_oleo_atuador        String?  @db.VarChar(100) /// Tipo de óleo do atuador
+  conjugado_nominal        String?  @db.VarChar(50) /// Conjugado nominal
+
+  // --- Dados técnicos: Sensores de temperatura ---
+  id_tipo_elemento_sensor  Int?
+  id_tipo_cabecote         Int?
+  num_elementos_sensores   String?  @db.VarChar(20) /// Nº de elementos sensores
+  comprimento_luva         String?  @db.VarChar(50) /// Comprimento da luva
+  material_protecao        String?  @db.VarChar(100) /// Material da proteção externa
+  diametro_protecao        String?  @db.VarChar(50) /// Diâmetro da proteção externa
+  comprimento_u            String?  @db.VarChar(50) /// Comprimento "U"
+  penetracao               String?  @db.VarChar(50) /// Penetração
+
+  // --- Dados técnicos: Transmissores ---
+  material_diafragma       String?  @db.VarChar(100) /// Material do diafragma
+  material_flanges         String?  @db.VarChar(100) /// Material dos flanges
+  material_drenos          String?  @db.VarChar(100) /// Material dos drenos e adaptadores
+  id_posicao_dreno         Int?
+  sobrepressao             String?  @db.VarChar(50) /// Sobrepressão
+  tipo_montagem            String?  @db.VarChar(100) /// Tipo de montagem
+  id_tipo_ajuste_remoto    Int?
+  id_tipo_indicador_local  Int?
+  id_tipo_ajuste_local     Int?
+  conexao_eletrica         String?  @db.VarChar(100) /// Conexão elétrica
+  manifold                 String?  @db.VarChar(100) /// Manifold
+
+  // --- Dados técnicos: Elemento primário (placas de orifício) ---
+  material_elem_primario   String?  @db.VarChar(100) /// Material do elemento primário
+  tomada_tipo              String?  @db.VarChar(50) /// Tomada tipo
+  fluido_medicao           String?  @db.VarChar(100) /// Fluido em medição
+  vazao_minima             String?  @db.VarChar(50) /// Vazão mínima
+  vazao_maxima             String?  @db.VarChar(50) /// Vazão máxima
+  vazao_normal             String?  @db.VarChar(50) /// Vazão normal
+  vazao_fim_escala         String?  @db.VarChar(50) /// Vazão fim de escala
+  pressao_diferencial      String?  @db.VarChar(50) /// Pressão diferencial
+  temperatura_processo     String?  @db.VarChar(50) /// Temperatura do processo
+  diametro_d               String?  @db.VarChar(50) /// Diâmetro "D"
+  diametro_d_orificio      String?  @db.VarChar(50) /// Diâmetro "d" Orifício
+
+  // --- Loops ---
+  ponto_ajuste             String?  @db.VarChar(50) /// Ponto de ajuste
+  quantidade_loops         Int? /// Quantidade de loops
+  range_loop1              String?  @db.VarChar(100)
+  range_loop2              String?  @db.VarChar(100)
+  range_loop3              String?  @db.VarChar(100)
+  range_loop4              String?  @db.VarChar(100)
+
+  // --- Links/documentos ---
+  link_mop                 String?  @db.VarChar(500) /// Link para MOP
+  link_manuais             String?  @db.VarChar(500) /// Link para manuais
+  link_conf_metrologica    String?  @db.VarChar(500) /// Link para conf. metrológica
+  link_proc_manutencao     String?  @db.VarChar(500) /// Link para proc. manutenção
+  foto_equipamento         String?  @db.VarChar(500) /// URL da foto principal
+
+  // --- Ferramentas ---
+  ferramentas_necessarias  String?  @db.Text /// Ferramentas necessárias para intervenção
+
+  criado_em                DateTime @default(now())
+  atualizado_em            DateTime @updatedAt
+
+  // --- Relacionamentos ---
+  empresa                  PO_Empresa            @relation(fields: [id_empresa], references: [id])
+  fabricante               PO_Fabricante?         @relation(fields: [id_fabricante], references: [id])
+  area                     PO_Area?               @relation(fields: [id_area], references: [id])
+  familia                  PO_Familia?            @relation(fields: [id_familia], references: [id])
+  processo                 PO_Processo?           @relation(fields: [id_processo], references: [id])
+  conexao                  PO_Conexao?            @relation(fields: [id_conexao], references: [id])
+  sinal_entrada            PO_SinalEntrada?       @relation(fields: [id_sinal_entrada], references: [id])
+  sinal_saida              PO_SinalSaida?         @relation(fields: [id_sinal_saida], references: [id])
+  protocolo                PO_Protocolo?          @relation(fields: [id_protocolo], references: [id])
+  alimentacao              PO_Alimentacao?        @relation(fields: [id_alimentacao], references: [id])
+  tipo_valvula             PO_TipoValvula?        @relation(fields: [id_tipo_valvula], references: [id])
+  tipo_atuador             PO_TipoAtuador?        @relation(fields: [id_tipo_atuador], references: [id])
+  tipo_elemento_sensor     PO_TipoElementoSensor? @relation(fields: [id_tipo_elemento_sensor], references: [id])
+  tipo_cabecote            PO_TipoCabecote?       @relation(fields: [id_tipo_cabecote], references: [id])
+  posicao_dreno            PO_PosicaoDreno?       @relation(fields: [id_posicao_dreno], references: [id])
+  tipo_ajuste_remoto       PO_TipoAjusteRemoto?   @relation(fields: [id_tipo_ajuste_remoto], references: [id])
+  tipo_indicador_local     PO_TipoIndicadorLocal? @relation(fields: [id_tipo_indicador_local], references: [id])
+  tipo_ajuste_local        PO_TipoAjusteLocal?    @relation(fields: [id_tipo_ajuste_local], references: [id])
+
+  inspecoes                PO_Inspecao[]
+  calibracoes              PO_Calibracao[]
+  ordens_servico           PO_OrdemServico[]
+  fluxogramas              PO_Fluxograma[]
+  fotos                    PO_Foto[]
+
+  @@unique([id_empresa, tag])
+  @@index([id_empresa])
+  @@index([id_empresa, id_area])
+  @@index([id_empresa, id_familia])
+  @@index([id_empresa, proxima_calibracao])
+  @@map("po_equipamento")
+}
+
+/// Inspeção de campo (Check Loop) - registros do técnico em campo
+model PO_Inspecao {
+  id                   Int       @id @default(autoincrement())
+  id_empresa           Int
+  id_equipamento       Int /// FK para PO_Equipamento
+  data                 DateTime  @default(now()) /// Data/hora da inspeção
+  leitura              Float? /// Valor lido no instrumento
+  diagnostico_hart     Boolean   @default(false) /// Se executou diagnóstico HART
+  resultado_hart       Json? /// Resultado do diagnóstico HART
+  foto_url             String?   @db.VarChar(500) /// URL da foto capturada
+  latitude             Decimal?  @db.Decimal(10, 7) /// Latitude GPS
+  longitude            Decimal?  @db.Decimal(10, 7) /// Longitude GPS
+  observacoes          String?   @db.Text /// Observações do técnico
+  status               String    @db.VarChar(20) /// OK, Alerta, Pendente
+  desvio_percentual    Float? /// % de desvio encontrado
+  id_executante        Int? /// FK para PO_Executante
+  criado_em            DateTime  @default(now())
+
+  empresa              PO_Empresa     @relation(fields: [id_empresa], references: [id])
+  equipamento          PO_Equipamento @relation(fields: [id_equipamento], references: [id])
+  executante           PO_Executante? @relation(fields: [id_executante], references: [id])
+
+  @@index([id_empresa])
+  @@index([id_empresa, id_equipamento])
+  @@index([id_empresa, data])
+  @@map("po_inspecao")
+}
+
+/// Calibração do instrumento (normalizada da tabela "Últimas calibrações" do Access)
+model PO_Calibracao {
+  id                   Int      @id @default(autoincrement())
+  id_empresa           Int
+  id_equipamento       Int /// FK para PO_Equipamento
+  data                 DateTime /// Data da calibração
+  tipo                 String   @db.VarChar(50) /// Com ajuste, Sem ajuste
+  unidade_entrada      String?  @db.VarChar(30) /// Unidade da grandeza de entrada (ex: pH, mA)
+  unidade_saida        String?  @db.VarChar(30) /// Unidade da grandeza de saída
+  resultado            String?  @db.VarChar(30) /// Aprovado, Reprovado
+  desvio_maximo        Float? /// Maior desvio encontrado (%)
+  certificado_url      String?  @db.VarChar(500) /// URL do certificado gerado
+  id_executante        Int?
+  aprovado_por         String?  @db.VarChar(200) /// Nome de quem aprovou
+  observacoes          String?  @db.Text
+  criado_em            DateTime @default(now())
+
+  empresa              PO_Empresa     @relation(fields: [id_empresa], references: [id])
+  equipamento          PO_Equipamento @relation(fields: [id_equipamento], references: [id])
+  executante           PO_Executante? @relation(fields: [id_executante], references: [id])
+  pontos               PO_PontoCalibracao[]
+
+  @@index([id_empresa])
+  @@index([id_empresa, id_equipamento])
+  @@map("po_calibracao")
+}
+
+/// Ponto individual de calibração (normalização: colunas DADOS1A-5E → linhas)
+/// No Access, os pontos eram DADOS1A, DADOS1B...DADOS5E (5 pontos x 5 colunas = 25 colunas)
+/// Aqui cada ponto é uma linha com número do ponto, valor aplicado, valor lido subida/descida
+model PO_PontoCalibracao {
+  id                   Int    @id @default(autoincrement())
+  id_calibracao        Int /// FK para PO_Calibracao
+  numero_ponto         Int /// 1, 2, 3, 4, 5 (posição na escala)
+  percentual_escala    Float? /// 0%, 25%, 50%, 75%, 100%
+  valor_aplicado       Float? /// Valor padrão aplicado
+  valor_lido_subida    Float? /// Valor lido na subida (ascendente)
+  valor_lido_descida   Float? /// Valor lido na descida (descendente)
+  erro_subida          Float? /// Erro calculado na subida (%)
+  erro_descida         Float? /// Erro calculado na descida (%)
+
+  calibracao           PO_Calibracao @relation(fields: [id_calibracao], references: [id], onDelete: Cascade)
+
+  @@index([id_calibracao])
+  @@map("po_ponto_calibracao")
+}
+
+/// Ordem de serviço / relatório de manutenção (ex-tabela Relatórios do Access)
+model PO_OrdemServico {
+  id                   Int      @id @default(autoincrement())
+  id_empresa           Int
+  id_equipamento       Int /// FK para PO_Equipamento
+  data                 DateTime /// Data da intervenção
+  numero_os            String?  @db.VarChar(50) /// Número da OS (ref externa)
+  id_tipo              Int? /// FK para PO_Tipo
+  id_causa             Int? /// FK para PO_Causa
+  descricao            String   @db.Text /// Descrição do serviço executado
+  id_executante        Int? /// FK para PO_Executante
+  pendencia            Boolean  @default(false) /// Se ficou pendência
+  descricao_pendencia  String?  @db.Text /// Detalhe da pendência
+  prioridade           String?  @db.VarChar(20) /// Alta, Média, Baixa
+  criado_em            DateTime @default(now())
+  atualizado_em        DateTime @updatedAt
+
+  empresa              PO_Empresa     @relation(fields: [id_empresa], references: [id])
+  equipamento          PO_Equipamento @relation(fields: [id_equipamento], references: [id])
+  tipo                 PO_Tipo?       @relation(fields: [id_tipo], references: [id])
+  causa                PO_Causa?      @relation(fields: [id_causa], references: [id])
+  executante           PO_Executante? @relation(fields: [id_executante], references: [id])
+
+  @@index([id_empresa])
+  @@index([id_empresa, id_equipamento])
+  @@map("po_ordem_servico")
+}
+
+/// Fluxogramas associados a equipamentos
+model PO_Fluxograma {
+  id               Int      @id @default(autoincrement())
+  id_empresa       Int
+  id_equipamento   Int
+  arquivo_url      String   @db.VarChar(500) /// URL do arquivo do fluxograma
+  descricao        String?  @db.VarChar(300)
+  criado_em        DateTime @default(now())
+
+  empresa          PO_Empresa     @relation(fields: [id_empresa], references: [id])
+  equipamento      PO_Equipamento @relation(fields: [id_equipamento], references: [id])
+
+  @@index([id_empresa])
+  @@map("po_fluxograma")
+}
+
+/// Fotos de equipamentos
+model PO_Foto {
+  id               Int      @id @default(autoincrement())
+  id_empresa       Int
+  id_equipamento   Int
+  arquivo_url      String   @db.VarChar(500) /// URL da foto
+  descricao        String?  @db.VarChar(300)
+  criado_em        DateTime @default(now())
+
+  empresa          PO_Empresa     @relation(fields: [id_empresa], references: [id])
+  equipamento      PO_Equipamento @relation(fields: [id_equipamento], references: [id])
+
+  @@index([id_empresa])
+  @@map("po_foto")
+}
+
+/// KPIs mensais para dashboard executivo
+model PO_KpiMensal {
+  id                   Int      @id @default(autoincrement())
+  id_empresa           Int
+  ano_mes              String   @db.VarChar(7) /// "2026-02"
+  taxa_check_loop      Float? /// % de compliance do Check Loop
+  paradas_np           Int? /// Número de paradas não planejadas
+  mtbf_horas           Float? /// MTBF em horas
+  os_planejadas_pct    Float? /// % de OS planejadas
+  roi_multiplicador    Float? /// ROI realizado (ex: 6.8x)
+  beneficio_liquido    Decimal? @db.Decimal(12, 2) /// Valor em R$ do benefício
+  maturidade_m3        Float? /// Score de maturidade M3
+  criado_em            DateTime @default(now())
+
+  empresa              PO_Empresa @relation(fields: [id_empresa], references: [id])
+
+  @@unique([id_empresa, ano_mes])
+  @@index([id_empresa])
+  @@map("po_kpi_mensal")
+}
