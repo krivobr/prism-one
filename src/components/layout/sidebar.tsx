@@ -26,9 +26,9 @@ import { signOut } from 'next-auth/react'
 
 interface SidebarProps {
   user: {
-    name: string
-    papel: string
-    empresa_nome: string
+    name?: string | null
+    papel?: string | null
+    empresa_nome?: string | null
   }
 }
 
@@ -94,7 +94,7 @@ export function Sidebar({ user }: SidebarProps) {
       {/* Empresa */}
       <div className="px-4 py-3 border-b border-slate-700/50">
         <p className="text-xs text-slate-500">Empresa</p>
-        <p className="text-sm text-slate-300 font-medium truncate">{user.empresa_nome}</p>
+        <p className="text-sm text-slate-300 font-medium truncate">{user.empresa_nome ?? 'Carregando...'}</p>
       </div>
 
       {/* Navigation */}
@@ -198,8 +198,8 @@ export function Sidebar({ user }: SidebarProps) {
       <div className="px-4 py-3 border-t border-slate-700/50">
         <div className="flex items-center justify-between">
           <div className="min-w-0">
-            <p className="text-sm text-white truncate">{user.name}</p>
-            <p className="text-xs text-slate-500 capitalize">{user.papel}</p>
+            <p className="text-sm text-white truncate">{user.name ?? 'Usuário'}</p>
+            <p className="text-xs text-slate-500 capitalize">{user.papel ?? ''}</p>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}

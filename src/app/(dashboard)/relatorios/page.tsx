@@ -1,54 +1,51 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
+import { useSession } from 'next-auth/react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 import { FileDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-interface DashboardData {
-  kpis: { totalEquipamentos: number; ativos: number; calibracoesVencidas: number; pendencias: number }
-  equipamentosPorFamilia: { nome: string; quantidade: number }[]
-  equipamentosPorArea: { nome: string; quantidade: number }[]
-  ordensPorTipo: { nome: string; quantidade: number }[]
+interface RelatorioData {
+  evolucaoCheckLoop: { mes: string; valor: number }[]
+  paradasNP: { mes: string; valor: number }[]
+  top5Malhas: { tag: string; icd: number; ultimaInspecao: string; desvio: number; status: string }[]
+  checkLoopPercent: number
+  mtbfAlta: number
+  osPlanejadasPercent: number
+  totalCalibracoes: { aprovadas: number; reprovadas: number }
 }
 
-const COLORS = ['#10B981', '#06B6D4', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#6366F1', '#14B8A6']
+interface DashboardData {
+  kpis: { totalEquipamentos: number; ativos: number; calibracoesVencidas: number; pendencias: number }
+}
 
-// Mock data for evolution charts (would come from KPI history)
-const evolucaoCheckLoop = [
-  { mes: 'Jan', valor: 62 }, { mes: 'Fev', valor: 71 }, { mes: 'Mar', valor: 75 },
-  { mes: 'Abr', valor: 80 }, { mes: 'Mai', valor: 84 }, { mes: 'Jun', valor: 84 },
-  { mes: 'Jul', valor: 94 }, { mes: 'Ago', valor: 96 }, { mes: 'Set', valor: 97 },
-  { mes: 'Out', valor: 98 }, { mes: 'Nov', valor: 98 }, { mes: 'Dez', valor: 98 },
-]
-
-const paradasNP = [
-  { mes: 'Jan', valor: 3 }, { mes: 'Fev', valor: 3 }, { mes: 'Mar', valor: 2 },
-  { mes: 'Abr', valor: 2 }, { mes: 'Mai', valor: 2 }, { mes: 'Jun', valor: 1 },
-  { mes: 'Jul', valor: 1 }, { mes: 'Ago', valor: 1 }, { mes: 'Set', valor: 1 },
-  { mes: 'Out', valor: 1 }, { mes: 'Nov', valor: 1 }, { mes: 'Dez', valor: 0 },
-]
+const TOOLTIP_STYLE = { background: 'hsl(222 47% 14%)', border: '1px solid hsl(217 33% 20%)', borderRadius: 8, color: '#fff' }
 
 export default function RelatoriosPage() {
-  const [data, setData] = useState<DashboardData | null>(null)
+  const { data: session } = useSession()
+  const [rel, setRel] = useState<RelatorioData | null>(null)
+  const [dash, setDash] = useState<DashboardData | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [pagina, setPagina] = useState(1)
   const [imprimindo, setImprimindo] = useState(false)
   const totalPaginas = 4
 
+  const empresaNome = (session?.user as any)?.empresa_nome ?? 'Empresa'
+
   useEffect(() => {
-    async function carregar() {
-      try {
-        const res = await fetch('/api/dashboard')
-        if (res.ok) setData(await res.json())
-      } catch { /* ignore */ }
+    Promise.all([
+      fetch('/api/relatorios').then(r => r.ok ? r.json() : null),
+      fetch('/api/dashboard').then(r => r.ok ? r.json() : null),
+    ]).then(([relData, dashData]) => {
+      setRel(relData)
+      setDash(dashData)
       setCarregando(false)
-    }
-    carregar()
+    }).catch(() => setCarregando(false))
   }, [])
 
   if (carregando) return <div className="flex items-center justify-center h-64"><p className="text-slate-500">Carregando...</p></div>
-  if (!data) return <div className="flex items-center justify-center h-64"><p className="text-red-400">Erro ao carregar</p></div>
+  if (!rel || !dash) return <div className="flex items-center justify-center h-64"><p className="text-red-400">Erro ao carregar relatórios</p></div>
 
   return (
     <div className="space-y-6">
@@ -62,10 +59,7 @@ export default function RelatoriosPage() {
         <button
           onClick={() => {
             setImprimindo(true)
-            setTimeout(() => {
-              window.print()
-              setImprimindo(false)
-            }, 100)
+            setTimeout(() => { window.print(); setImprimindo(false) }, 100)
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition shrink-0 no-print"
         >
@@ -74,23 +68,22 @@ export default function RelatoriosPage() {
         </button>
       </div>
 
-      {/* Page content — Normal mode: show current page, Print mode: show all */}
       {imprimindo ? (
         <>
-          <Pagina1 data={data} />
+          <Pagina1 rel={rel} dash={dash} empresaNome={empresaNome} />
           <div className="print-page-break" />
-          <Pagina2 data={data} />
+          <Pagina2 rel={rel} />
           <div className="print-page-break" />
-          <Pagina3 />
+          <Pagina3 rel={rel} />
           <div className="print-page-break" />
-          <Pagina4 />
+          <Pagina4 rel={rel} dash={dash} />
         </>
       ) : (
         <>
-          {pagina === 1 && <Pagina1 data={data} />}
-          {pagina === 2 && <Pagina2 data={data} />}
-          {pagina === 3 && <Pagina3 />}
-          {pagina === 4 && <Pagina4 />}
+          {pagina === 1 && <Pagina1 rel={rel} dash={dash} empresaNome={empresaNome} />}
+          {pagina === 2 && <Pagina2 rel={rel} />}
+          {pagina === 3 && <Pagina3 rel={rel} />}
+          {pagina === 4 && <Pagina4 rel={rel} dash={dash} />}
         </>
       )}
 
@@ -116,8 +109,8 @@ export default function RelatoriosPage() {
   )
 }
 
-// Página 1: Resumo executivo + KPIs + Evolução Check Loop (mockup imagem 2)
-function Pagina1({ data }: { data: DashboardData }) {
+// ─── Página 1: Resumo Executivo + KPIs + Evolução Check Loop ───
+function Pagina1({ rel, dash, empresaNome }: { rel: RelatorioData; dash: DashboardData; empresaNome: string }) {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-700/50 p-6" style={{ background: 'hsl(222 47% 11%)' }}>
@@ -125,8 +118,7 @@ function Pagina1({ data }: { data: DashboardData }) {
           <div>
             <p className="text-xs text-slate-500">FSTECH PRISM™ ONE</p>
             <h2 className="text-xl font-bold text-white mt-1">Relatório Executivo</h2>
-            <p className="text-sm text-slate-400 mt-0.5">Mineração Vale do Cobre S.A. — Unidade Sossego</p>
-            <p className="text-xs text-slate-500 mt-1">Ref. REL-2026-03-001</p>
+            <p className="text-sm text-slate-400 mt-0.5">{empresaNome}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-slate-500">Gerado automaticamente</p>
@@ -135,75 +127,66 @@ function Pagina1({ data }: { data: DashboardData }) {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards — dados reais */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard valor="98%" label="Check Loop" meta="Meta ≥90%" ok />
-        <KpiCard valor={String(data.kpis.calibracoesVencidas)} label="Paradas NP" meta="Meta ≤2/mês" ok={data.kpis.calibracoesVencidas <= 2} />
-        <KpiCard valor="412h" label="MTBF ALTA" meta="Meta ≥350h" ok />
-        <KpiCard valor="71%" label="OS Plan." meta="Meta ≥70%" ok />
+        <KpiCard valor={`${rel.checkLoopPercent}%`} label="Check Loop" meta="Meta ≥90%" ok={rel.checkLoopPercent >= 90} />
+        <KpiCard valor={String(dash.kpis.calibracoesVencidas)} label="Calib. Vencidas" meta="Meta ≤2" ok={dash.kpis.calibracoesVencidas <= 2} />
+        <KpiCard valor={`${rel.mtbfAlta}h`} label="MTBF ALTA" meta="Meta ≥350h" ok={rel.mtbfAlta >= 350} />
+        <KpiCard valor={`${rel.osPlanejadasPercent}%`} label="OS Plan." meta="Meta ≥70%" ok={rel.osPlanejadasPercent >= 70} />
       </div>
 
-      {/* Evolução Check Loop 12 meses */}
+      {/* Evolução Check Loop 12 meses — dados reais */}
       <div className="rounded-xl border border-slate-700/50 p-5" style={{ background: 'hsl(222 47% 11%)' }}>
         <h3 className="text-sm font-semibold text-white mb-4">Evolução Check Loop — 12 Meses (%)</h3>
         <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={evolucaoCheckLoop}>
+          <BarChart data={rel.evolucaoCheckLoop}>
             <XAxis dataKey="mes" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} />
             <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} domain={[0, 100]} />
-            <Tooltip contentStyle={{ background: 'hsl(222 47% 14%)', border: '1px solid hsl(217 33% 20%)', borderRadius: 8, color: '#fff' }} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} />
             <Bar dataKey="valor" fill="#10B981" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
         <div className="flex items-center justify-between mt-2">
           <p className="text-xs text-slate-500">Meta: ≥ 90%</p>
-          <p className="text-xs text-emerald-400">Fev: 98% ✓</p>
+          <p className={cn('text-xs', rel.checkLoopPercent >= 90 ? 'text-emerald-400' : 'text-red-400')}>
+            Atual: {rel.checkLoopPercent}% {rel.checkLoopPercent >= 90 ? '✓' : '✗'}
+          </p>
         </div>
       </div>
     </div>
   )
 }
 
-// Página 2: Confiabilidade & Paradas (mockup imagem 1)
-function Pagina2({ data }: { data: DashboardData }) {
-  // Top 5 malhas mock (would come from instruments with highest ICD)
-  const top5Malhas = [
-    { tag: 'FT-1100A', icd: 22, ultimaInsp: '18/02/2026', desvio: 'Pendente', status: 'Pendente' },
-    { tag: 'TT-1100B', icd: 21, ultimaInsp: '15/03/2026', desvio: '0.4%', status: 'OK' },
-    { tag: 'PT-2210', icd: 19, ultimaInsp: '10/03/2026', desvio: '1.8%', status: 'Alerta' },
-    { tag: 'LT-3301', icd: 18, ultimaInsp: '01/03/2026', desvio: 'Pendente', status: 'Pendente' },
-    { tag: 'AT-4401', icd: 17, ultimaInsp: '14/03/2026', desvio: '0.1%', status: 'OK' },
-  ]
-
+// ─── Página 2: Confiabilidade & Paradas ───
+function Pagina2({ rel }: { rel: RelatorioData }) {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-700/50 p-5" style={{ background: 'hsl(222 47% 11%)' }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-white">Confiabilidade & Paradas</h3>
-          <span className="text-sm text-slate-400">Fevereiro 2026</span>
+          <span className="text-sm text-slate-400">{new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span>
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">
-          {/* Paradas NP / Mês */}
           <div>
-            <h4 className="text-xs text-slate-400 uppercase mb-2">Paradas NP / Mês</h4>
+            <h4 className="text-xs text-slate-400 uppercase mb-2">Paradas NP / Mês (OS Corretivas)</h4>
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={paradasNP}>
+              <BarChart data={rel.paradasNP}>
                 <XAxis dataKey="mes" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} />
                 <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} />
-                <Tooltip contentStyle={{ background: 'hsl(222 47% 14%)', border: '1px solid hsl(217 33% 20%)', borderRadius: 8, color: '#fff' }} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
                 <Bar dataKey="valor" fill="#F87171" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          {/* MTBF Malhas Alta */}
           <div>
-            <h4 className="text-xs text-slate-400 uppercase mb-2">MTBF Malhas Alta (h)</h4>
+            <h4 className="text-xs text-slate-400 uppercase mb-2">Evolução Check Loop (%)</h4>
             <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={evolucaoCheckLoop.map((d, i) => ({ mes: d.mes, valor: 200 + i * 25 }))}>
+              <LineChart data={rel.evolucaoCheckLoop}>
                 <XAxis dataKey="mes" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} />
-                <Tooltip contentStyle={{ background: 'hsl(222 47% 14%)', border: '1px solid hsl(217 33% 20%)', borderRadius: 8, color: '#fff' }} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} domain={[0, 100]} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
                 <Line type="monotone" dataKey="valor" stroke="#F59E0B" strokeWidth={2} dot={{ r: 2 }} />
               </LineChart>
             </ResponsiveContainer>
@@ -211,90 +194,109 @@ function Pagina2({ data }: { data: DashboardData }) {
         </div>
       </div>
 
-      {/* Top 5 Malhas */}
+      {/* Top 5 Malhas — dados reais */}
       <div className="rounded-xl border border-slate-700/50 p-5" style={{ background: 'hsl(222 47% 11%)' }}>
-        <h3 className="text-sm font-semibold text-white mb-3">Top 5 Malhas — Atenção Este Mês</h3>
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-slate-700/50">
-              <th className="text-left px-3 py-2 text-xs text-slate-400 uppercase">TAG</th>
-              <th className="text-center px-3 py-2 text-xs text-slate-400 uppercase">ICD</th>
-              <th className="text-center px-3 py-2 text-xs text-slate-400 uppercase">Última Insp.</th>
-              <th className="text-center px-3 py-2 text-xs text-slate-400 uppercase">Desvio</th>
-              <th className="text-center px-3 py-2 text-xs text-slate-400 uppercase">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {top5Malhas.map(m => (
-              <tr key={m.tag} className="border-b border-slate-700/30 last:border-0">
-                <td className="px-3 py-2.5 font-mono text-sm text-white">{m.tag}</td>
-                <td className="px-3 py-2.5 text-center">
-                  <span className={cn('inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold',
-                    m.icd >= 20 ? 'bg-red-600/20 text-red-400' : 'bg-yellow-600/20 text-yellow-400'
-                  )}>{m.icd}</span>
-                </td>
-                <td className="px-3 py-2.5 text-center text-sm text-slate-400">{m.ultimaInsp}</td>
-                <td className="px-3 py-2.5 text-center text-sm">
-                  <span className={cn(m.desvio === 'Pendente' ? 'text-yellow-400' : parseFloat(m.desvio) > 1 ? 'text-red-400' : 'text-emerald-400')}>{m.desvio}</span>
-                </td>
-                <td className="px-3 py-2.5 text-center">
-                  <span className={cn('text-xs px-2 py-0.5 rounded-full',
-                    m.status === 'OK' ? 'bg-emerald-600/20 text-emerald-400' :
-                    m.status === 'Alerta' ? 'bg-yellow-600/20 text-yellow-400' :
-                    'bg-slate-600/20 text-slate-400'
-                  )}>{m.status === 'OK' ? '✓ Ok' : m.status === 'Alerta' ? '⚠ Alerta' : '● Pendente'}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <h3 className="text-sm font-semibold text-white mb-3">Top 5 Malhas — Maior ICD</h3>
+        {rel.top5Malhas.length === 0 ? (
+          <p className="text-sm text-slate-500 py-4 text-center">Nenhum equipamento com ICD registrado</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-700/50">
+                  <th className="text-left px-3 py-2 text-xs text-slate-400 uppercase">TAG</th>
+                  <th className="text-center px-3 py-2 text-xs text-slate-400 uppercase">ICD</th>
+                  <th className="text-center px-3 py-2 text-xs text-slate-400 uppercase">Última Insp.</th>
+                  <th className="text-center px-3 py-2 text-xs text-slate-400 uppercase">Desvio</th>
+                  <th className="text-center px-3 py-2 text-xs text-slate-400 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rel.top5Malhas.map(m => (
+                  <tr key={m.tag} className="border-b border-slate-700/30 last:border-0">
+                    <td className="px-3 py-2.5 font-mono text-sm text-white">{m.tag}</td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={cn('inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold',
+                        m.icd >= 20 ? 'bg-red-600/20 text-red-400' : m.icd >= 15 ? 'bg-yellow-600/20 text-yellow-400' : 'bg-emerald-600/20 text-emerald-400'
+                      )}>{m.icd}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center text-sm text-slate-400">
+                      {m.ultimaInspecao !== '-' ? new Date(m.ultimaInspecao).toLocaleDateString('pt-BR') : '-'}
+                    </td>
+                    <td className="px-3 py-2.5 text-center text-sm">
+                      <span className={cn(
+                        m.desvio === 0 && m.status === 'Sem inspeção' ? 'text-slate-500' :
+                        m.desvio > 1 ? 'text-red-400' : 'text-emerald-400'
+                      )}>
+                        {m.status === 'Sem inspeção' ? 'Pendente' : `${m.desvio}%`}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={cn('text-xs px-2 py-0.5 rounded-full',
+                        m.status === 'OK' ? 'bg-emerald-600/20 text-emerald-400' :
+                        m.status === 'Alerta' ? 'bg-yellow-600/20 text-yellow-400' :
+                        'bg-slate-600/20 text-slate-400'
+                      )}>
+                        {m.status === 'OK' ? '✓ Ok' : m.status === 'Alerta' ? '⚠ Alerta' : '● ' + m.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-// Página 3: ROI Acumulado (mockup imagem 7)
-function Pagina3() {
+// ─── Página 3: ROI Acumulado ───
+function Pagina3({ rel }: { rel: RelatorioData }) {
+  const totalCalib = rel.totalCalibracoes.aprovadas + rel.totalCalibracoes.reprovadas
+  const taxaAprov = totalCalib > 0 ? Math.round((rel.totalCalibracoes.aprovadas / totalCalib) * 100) : 0
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-700/50 p-5" style={{ background: 'hsl(222 47% 11%)' }}>
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-bold text-white">Retorno Financeiro — ROI Acumulado</h3>
-          <span className="text-sm text-slate-400">Fevereiro 2026</span>
+          <h3 className="text-lg font-bold text-white">Indicadores de Qualidade</h3>
+          <span className="text-sm text-slate-400">{new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="text-center">
-            <p className="text-4xl font-bold text-emerald-400">6,8×</p>
-            <p className="text-xs text-slate-400 mt-1">ROI Realizado</p>
-            <p className="text-xs text-slate-500">Meta: ≥ 4×</p>
+            <p className="text-4xl font-bold text-emerald-400">{rel.totalCalibracoes.aprovadas}</p>
+            <p className="text-xs text-slate-400 mt-1">Calibrações Aprovadas</p>
           </div>
           <div className="text-center">
-            <p className="text-4xl font-bold text-white">R$ 6,69M</p>
-            <p className="text-xs text-slate-400 mt-1">Benefício Líquido</p>
-            <p className="text-xs text-slate-500">Ano 1</p>
+            <p className="text-4xl font-bold text-red-400">{rel.totalCalibracoes.reprovadas}</p>
+            <p className="text-xs text-slate-400 mt-1">Calibrações Reprovadas</p>
           </div>
           <div className="text-center">
-            <p className="text-4xl font-bold text-cyan-400">1,2</p>
-            <p className="text-xs text-slate-400 mt-1">meses</p>
-            <p className="text-xs text-slate-500">Payback · Sobre R$ 985k</p>
+            <p className={cn('text-4xl font-bold', taxaAprov >= 90 ? 'text-emerald-400' : 'text-yellow-400')}>{taxaAprov}%</p>
+            <p className="text-xs text-slate-400 mt-1">Taxa de Aprovação</p>
+          </div>
+          <div className="text-center">
+            <p className={cn('text-4xl font-bold', rel.checkLoopPercent >= 90 ? 'text-emerald-400' : 'text-yellow-400')}>{rel.checkLoopPercent}%</p>
+            <p className="text-xs text-slate-400 mt-1">Check Loop OK</p>
           </div>
         </div>
       </div>
 
-      {/* Composição do Benefício */}
+      {/* Resumo de Confiabilidade */}
       <div className="rounded-xl border border-slate-700/50 p-5" style={{ background: 'hsl(222 47% 11%)' }}>
-        <h3 className="text-sm font-semibold text-white mb-4">Composição do Benefício</h3>
+        <h3 className="text-sm font-semibold text-white mb-4">Resumo de Confiabilidade</h3>
         <div className="space-y-3">
           {[
-            { label: 'Paradas NP evitadas (17 eventos × R$ 185k)', valor: 'R$ 3,14M' },
-            { label: 'Redução OS corretivas não planejadas', valor: 'R$ 890k' },
-            { label: 'Qualidade — NC evitadas', valor: 'R$ 620k' },
-            { label: 'Disponibilidade + produtividade', valor: 'R$ 430k' },
+            { label: 'Check Loop — Inspeções OK (30 dias)', valor: `${rel.checkLoopPercent}%`, ok: rel.checkLoopPercent >= 90 },
+            { label: 'MTBF Médio — Malhas Alta Criticidade', valor: `${rel.mtbfAlta}h`, ok: rel.mtbfAlta >= 350 },
+            { label: 'OS Planejadas (Preventiva + Calibração)', valor: `${rel.osPlanejadasPercent}%`, ok: rel.osPlanejadasPercent >= 70 },
+            { label: 'Taxa de Aprovação de Calibrações', valor: `${taxaAprov}%`, ok: taxaAprov >= 90 },
           ].map(item => (
             <div key={item.label} className="flex items-center justify-between py-2 border-b border-slate-700/30 last:border-0">
               <span className="text-sm text-slate-300">{item.label}</span>
-              <span className="text-sm font-semibold text-emerald-400">{item.valor}</span>
+              <span className={cn('text-sm font-semibold', item.ok ? 'text-emerald-400' : 'text-yellow-400')}>{item.valor}</span>
             </div>
           ))}
         </div>
@@ -326,40 +328,68 @@ function Pagina3() {
   )
 }
 
-// Página 4: Ações e Recomendações (mockup imagem 3)
-function Pagina4() {
-  const alertas = [
-    { tag: 'PT-2210', prioridade: 'Alta', msg: 'Desvio 1,8% — acima do EMP 0,8%. Calibração preventiva recomendada.' },
-    { tag: 'FT-1100A', prioridade: 'Alta', msg: 'Check Loop pendente há 28 dias. Prioridade ALTA — ICD 22.' },
-    { tag: 'LT-3301', prioridade: 'Média', msg: 'Check Loop pendente há 18 dias. Agendar inspeção esta semana.' },
-  ]
+// ─── Página 4: Ações e Recomendações — geradas dinamicamente ───
+function Pagina4({ rel, dash }: { rel: RelatorioData; dash: DashboardData }) {
+  // Gerar alertas dinamicamente a partir dos dados reais
+  const alertas: { tag: string; prioridade: string; msg: string }[] = []
 
-  const proximosPassos = [
-    { num: '01', titulo: 'Calibração PT-2210', desc: 'Esta semana. OS gerada automaticamente no SAP PM — OS-2026-0342.', data: '07/03' },
-    { num: '02', titulo: 'Check Loop FT-1100A e LT-3301', desc: 'Incluir no roteiro desta semana no app.', data: '07/03' },
-    { num: '03', titulo: 'Reunião de Análise Mensal', desc: 'Dashboard ao vivo. Pauta gerada automaticamente — ver D4.', data: '10/03' },
-    { num: '04', titulo: 'Auditoria M3 — Pilar P3', desc: 'Agendada para 15/03. Evidências já coletadas pelo sistema.', data: '15/03' },
-  ]
+  // Alertas de equipamentos com ICD alto
+  rel.top5Malhas.forEach(m => {
+    if (m.icd >= 20 && m.status !== 'OK') {
+      alertas.push({
+        tag: m.tag,
+        prioridade: 'Alta',
+        msg: `ICD ${m.icd} — ${m.status === 'Sem inspeção' ? 'Check Loop pendente. Priorizar inspeção.' : `Desvio ${m.desvio}%. Verificar calibração.`}`,
+      })
+    } else if (m.icd >= 15 && m.status === 'Alerta') {
+      alertas.push({
+        tag: m.tag,
+        prioridade: 'Média',
+        msg: `ICD ${m.icd} — Desvio ${m.desvio}%. Agendar inspeção preventiva.`,
+      })
+    }
+  })
+
+  // Alerta de calibrações vencidas
+  if (dash.kpis.calibracoesVencidas > 0) {
+    alertas.push({
+      tag: 'GERAL',
+      prioridade: dash.kpis.calibracoesVencidas > 5 ? 'Alta' : 'Média',
+      msg: `${dash.kpis.calibracoesVencidas} calibração(ões) vencida(s). Agendar recalibração.`,
+    })
+  }
+
+  // Se não houver alertas
+  if (alertas.length === 0) {
+    alertas.push({
+      tag: 'SISTEMA',
+      prioridade: 'Info',
+      msg: 'Todos os indicadores estão dentro das metas. Manter rotina de inspeções.',
+    })
+  }
 
   return (
     <div className="space-y-4">
-      {/* Alertas */}
       <div className="rounded-xl border border-slate-700/50 p-5" style={{ background: 'hsl(222 47% 11%)' }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-white">Ações e Recomendações</h3>
-          <span className="text-sm text-slate-400">Março 2026</span>
+          <span className="text-sm text-slate-400">{new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span>
         </div>
 
         <h4 className="text-xs text-slate-400 uppercase tracking-wider mb-3">⚠ Alertas Gerados Pelo Sistema</h4>
         <div className="space-y-3">
           {alertas.map((a, i) => (
             <div key={i} className="flex gap-3 p-3 rounded-lg border border-slate-700/30" style={{ background: 'hsl(222 47% 13%)' }}>
-              <span className="text-yellow-400 text-lg mt-0.5">⚠</span>
+              <span className={cn('text-lg mt-0.5', a.prioridade === 'Alta' ? 'text-red-400' : a.prioridade === 'Info' ? 'text-emerald-400' : 'text-yellow-400')}>
+                {a.prioridade === 'Info' ? '✓' : '⚠'}
+              </span>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-bold text-white text-sm">{a.tag}</span>
                   <span className={cn('text-xs px-2 py-0.5 rounded-full',
-                    a.prioridade === 'Alta' ? 'bg-red-600/20 text-red-400' : 'bg-yellow-600/20 text-yellow-400'
+                    a.prioridade === 'Alta' ? 'bg-red-600/20 text-red-400' :
+                    a.prioridade === 'Info' ? 'bg-emerald-600/20 text-emerald-400' :
+                    'bg-yellow-600/20 text-yellow-400'
                   )}>Prioridade {a.prioridade}</span>
                 </div>
                 <p className="text-sm text-slate-300 mt-1">{a.msg}</p>
@@ -373,26 +403,29 @@ function Pagina4() {
       <div className="rounded-xl border border-slate-700/50 p-5" style={{ background: 'hsl(222 47% 11%)' }}>
         <h4 className="text-xs text-slate-400 uppercase tracking-wider mb-3">Próximos Passos Recomendados</h4>
         <div className="space-y-2">
-          {proximosPassos.map(p => (
+          {[
+            { num: '01', titulo: 'Executar Check Loop pendentes', desc: `${rel.top5Malhas.filter(m => m.status !== 'OK').length} instrumento(s) com inspeção pendente ou em alerta.` },
+            { num: '02', titulo: 'Recalibrar instrumentos vencidos', desc: `${dash.kpis.calibracoesVencidas} calibração(ões) vencida(s) identificada(s).` },
+            { num: '03', titulo: 'Revisar OS pendentes', desc: `${dash.kpis.pendencias} ordem(ns) de serviço pendente(s).` },
+            { num: '04', titulo: 'Reunião de Análise Mensal', desc: 'Dashboard ao vivo. Pauta gerada automaticamente pelo PRISM™ One.' },
+          ].map(p => (
             <div key={p.num} className="flex items-start gap-3 p-3 rounded-lg border border-slate-700/30 hover:border-emerald-600/30 transition" style={{ background: 'hsl(222 47% 13%)' }}>
               <span className="text-emerald-400 font-bold text-lg w-8">{p.num}</span>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-white">{p.titulo}</p>
                 <p className="text-xs text-slate-400 mt-0.5">{p.desc}</p>
               </div>
-              <span className="text-xs text-slate-500 whitespace-nowrap">{p.data}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Footer note */}
+      {/* Footer */}
       <div className="rounded-xl border border-emerald-600/30 p-4" style={{ background: 'hsl(160 84% 39% / 0.05)' }}>
         <p className="text-sm text-emerald-400">
-          Relatório gerado automaticamente pelo PRISM™ One em {new Date().toLocaleDateString('pt-BR')} às 00:01.
-          Nenhum trabalho manual necessário. Próximo relatório: {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')}.
+          Relatório gerado automaticamente pelo PRISM™ One em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
         </p>
-        <p className="text-xs text-slate-500 mt-1">Para dúvidas: carlos.mendes@fstech.com.br</p>
+        <p className="text-xs text-slate-500 mt-1">Dados calculados em tempo real a partir do banco de dados.</p>
       </div>
     </div>
   )

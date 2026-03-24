@@ -4,25 +4,28 @@ import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
+import type { Viewport } from 'next'
+
 export const metadata: Metadata = {
   title: 'PRISM ONE - Gestão de Instrumentação',
   description: 'Sistema de gestão de instrumentação industrial, calibração e manutenção',
   manifest: '/manifest.json',
-  themeColor: '#059669',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'PRISM ONE',
   },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
   other: {
     'mobile-web-app-capable': 'yes',
   },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#059669',
 }
 
 export default function RootLayout({
