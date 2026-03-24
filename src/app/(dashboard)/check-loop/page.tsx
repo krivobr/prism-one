@@ -13,7 +13,10 @@ interface Equipamento {
   status: string
   familia: { nome: string } | null
   ultima_calibracao: string | null
+  inspecoes: { id: number; data: string; status: string; desvio_percentual: number | null }[]
 }
+
+type CheckStatus = 'ok' | 'alerta' | 'pendente'
 
 export default function CheckLoopPage() {
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
@@ -37,9 +40,13 @@ export default function CheckLoopPage() {
     (e.descricao || '').toLowerCase().includes(busca.toLowerCase())
   )
 
-  // Simulated status - in production would come from inspections
-  const getCheckStatus = (eq: Equipamento) => {
-    return 'pendente' // All pending since no inspections yet
+  // Status real baseado na última inspeção do equipamento
+  const getCheckStatus = (eq: Equipamento): CheckStatus => {
+    const ultima = eq.inspecoes?.[0]
+    if (!ultima) return 'pendente'
+    if (ultima.status === 'OK') return 'ok'
+    if (ultima.status === 'Alerta') return 'alerta'
+    return 'pendente'
   }
 
   const statusConfig = {
@@ -48,8 +55,12 @@ export default function CheckLoopPage() {
     pendente: { label: 'Pendente', color: 'bg-slate-600/20 text-slate-400', dot: 'bg-slate-400' },
   }
 
-  const pendentes = filtrados.filter(() => true).length
+  // Contadores reais
   const total = filtrados.length
+  const okCount = filtrados.filter(e => getCheckStatus(e) === 'ok').length
+  const alertaCount = filtrados.filter(e => getCheckStatus(e) === 'alerta').length
+  const pendenteCount = filtrados.filter(e => getCheckStatus(e) === 'pendente').length
+  const progressPercent = total > 0 ? Math.round((okCount / total) * 100) : 0
 
   return (
     <div className="space-y-4">
@@ -60,19 +71,24 @@ export default function CheckLoopPage() {
         <p className="text-slate-400 text-sm mt-0.5">Inspeção de campo dos instrumentos</p>
       </div>
 
-      {/* Progress */}
+      {/* Progress — dados reais */}
       <div className="rounded-xl border border-slate-700/50 p-4" style={{ background: 'hsl(222 47% 11%)' }}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-slate-300">Progresso do mês</span>
-          <span className="text-sm font-semibold text-emerald-400">0%</span>
+          <span className={cn('text-sm font-semibold', progressPercent >= 90 ? 'text-emerald-400' : progressPercent >= 50 ? 'text-yellow-400' : 'text-slate-400')}>
+            {progressPercent}%
+          </span>
         </div>
         <div className="w-full h-2 rounded-full bg-slate-700">
-          <div className="h-2 rounded-full bg-emerald-500 transition-all" style={{ width: '0%' }} />
+          <div
+            className={cn('h-2 rounded-full transition-all', progressPercent >= 90 ? 'bg-emerald-500' : progressPercent >= 50 ? 'bg-yellow-500' : 'bg-slate-500')}
+            style={{ width: `${progressPercent}%` }}
+          />
         </div>
         <div className="flex justify-between mt-2 text-xs text-slate-500">
-          <span>{pendentes} pendentes</span>
-          <span>0 alertas</span>
-          <span>0 OK</span>
+          <span>{pendenteCount} pendentes</span>
+          <span>{alertaCount} alertas</span>
+          <span>{okCount} OK</span>
         </div>
       </div>
 
@@ -91,12 +107,12 @@ export default function CheckLoopPage() {
         ) : (
           filtrados.map((eq) => {
             const status = getCheckStatus(eq)
-            const cfg = statusConfig[status as keyof typeof statusConfig]
+            const cfg = statusConfig[status]
             return (
               <div key={eq.id} onClick={() => router.push(`/check-loop/${eq.id}`)} className="rounded-xl border border-slate-700/50 p-4 hover:border-emerald-600/30 transition-colors cursor-pointer" style={{ background: 'hsl(222 47% 11%)' }}>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    {eq.icd && (
+                    {eq.icd != null && (
                       <span className={cn(
                         'inline-flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold shrink-0',
                         eq.icd >= 20 ? 'bg-red-600/20 text-red-400' :

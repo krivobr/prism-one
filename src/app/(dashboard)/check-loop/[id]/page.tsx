@@ -72,10 +72,9 @@ export default function DetalheInstrumentoPage() {
 
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
 
-  // Mock drift history data (in production would come from inspections)
-  const historicoDeriva = inspecoes.length > 0
-    ? inspecoes.map(i => ({ data: formatDate(i.data), desvio: i.desvio_percentual || 0 })).reverse()
-    : [{ data: 'Jan', desvio: 0.2 }, { data: 'Fev', desvio: 0.3 }, { data: 'Mar', desvio: 0.1 }, { data: 'Abr', desvio: 0.4 }, { data: 'Mai', desvio: 0.2 }, { data: 'Jun', desvio: 0.5 }]
+  const historicoDeriva = inspecoes
+    .map(i => ({ data: formatDate(i.data), desvio: i.desvio_percentual || 0 }))
+    .reverse()
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
@@ -126,7 +125,7 @@ export default function DetalheInstrumentoPage() {
           <Field label="Sinal Entrada" value={equipamento.sinal_entrada?.nome} />
           <Field label="Sinal Saída" value={equipamento.sinal_saida?.nome} />
           <Field label="Alimentação" value={equipamento.alimentacao?.nome} />
-          <Field label="EMP do processo" value="—" />
+          <Field label="Período Calib." value={equipamento.periodo_calibracao ? `${equipamento.periodo_calibracao} meses` : null} />
           <Field label="Último check" value={formatDate(equipamento.ultima_calibracao)} />
           <Field label="Próxima calibração" value={formatDate(equipamento.proxima_calibracao)} />
         </div>
@@ -137,16 +136,22 @@ export default function DetalheInstrumentoPage() {
         <div className="flex items-center gap-2 mb-4">
           <TrendingDown className="w-4 h-4 text-emerald-400" />
           <h3 className="text-sm font-semibold text-white">Histórico de Deriva</h3>
-          <span className="text-xs text-slate-500">Últimas {historicoDeriva.length} inspeções</span>
+          {historicoDeriva.length > 0 && (
+            <span className="text-xs text-slate-500">Últimas {historicoDeriva.length} inspeções</span>
+          )}
         </div>
-        <ResponsiveContainer width="100%" height={150}>
-          <LineChart data={historicoDeriva}>
-            <XAxis dataKey="data" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} />
-            <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} unit="%" />
-            <Tooltip contentStyle={{ background: 'hsl(222 47% 14%)', border: '1px solid hsl(217 33% 20%)', borderRadius: 8, color: '#fff', fontSize: 12 }} />
-            <Line type="monotone" dataKey="desvio" stroke="#10B981" strokeWidth={2} dot={{ fill: '#10B981', r: 3 }} />
-          </LineChart>
-        </ResponsiveContainer>
+        {historicoDeriva.length > 0 ? (
+          <ResponsiveContainer width="100%" height={150}>
+            <LineChart data={historicoDeriva}>
+              <XAxis dataKey="data" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} />
+              <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} unit="%" />
+              <Tooltip contentStyle={{ background: 'hsl(222 47% 14%)', border: '1px solid hsl(217 33% 20%)', borderRadius: 8, color: '#fff', fontSize: 12 }} />
+              <Line type="monotone" dataKey="desvio" stroke="#10B981" strokeWidth={2} dot={{ fill: '#10B981', r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="text-sm text-slate-500 py-6 text-center">Nenhuma inspeção realizada. Inicie uma inspeção para gerar o histórico.</p>
+        )}
       </div>
 
       {/* Botão Iniciar Inspeção */}

@@ -32,6 +32,15 @@ export async function GET(request: NextRequest) {
       familia: true,
       fabricante: true,
       processo: true,
+      protocolo: true,
+      alimentacao: true,
+      sinal_entrada: true,
+      sinal_saida: true,
+      inspecoes: {
+        orderBy: { data: 'desc' },
+        take: 1,
+        select: { id: true, data: true, status: true, desvio_percentual: true },
+      },
     },
     orderBy: { tag: 'asc' },
   })

@@ -302,28 +302,8 @@ function Pagina3({ rel }: { rel: RelatorioData }) {
         </div>
       </div>
 
-      {/* Evolução Maturidade M3 */}
-      <div className="rounded-xl border border-slate-700/50 p-5" style={{ background: 'hsl(222 47% 11%)' }}>
-        <h3 className="text-sm font-semibold text-white mb-4">Evolução Maturidade M3</h3>
-        <div className="flex items-center justify-between">
-          <div className="text-center">
-            <p className="text-3xl font-bold text-slate-400">1,72</p>
-            <p className="text-xs text-slate-500 mt-1">Início</p>
-          </div>
-          <div className="flex-1 mx-6">
-            <div className="h-3 rounded-full bg-slate-700 relative overflow-hidden">
-              <div className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 via-emerald-500 to-cyan-500" style={{ width: '63%' }} />
-            </div>
-            <div className="flex justify-between mt-1 text-[10px] text-slate-500">
-              <span>Reativo</span><span>Preventivo</span><span>Orientado</span><span>Digital</span><span>Excel.</span>
-            </div>
-          </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold text-emerald-400">3,14</p>
-            <p className="text-xs text-slate-500 mt-1">Atual</p>
-          </div>
-        </div>
-      </div>
+      {/* Evolução Maturidade M3 — calculada dos KPIs */}
+      <MaturityM3 rel={rel} />
     </div>
   )
 }
@@ -426,6 +406,54 @@ function Pagina4({ rel, dash }: { rel: RelatorioData; dash: DashboardData }) {
           Relatório gerado automaticamente pelo PRISM™ One em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
         </p>
         <p className="text-xs text-slate-500 mt-1">Dados calculados em tempo real a partir do banco de dados.</p>
+      </div>
+    </div>
+  )
+}
+
+// Maturidade M3 calculada a partir dos KPIs reais
+// Escala 1-5: Reativo(1) → Preventivo(2) → Orientado(3) → Digital(4) → Excelência(5)
+// Fórmula: média ponderada de 4 indicadores normalizados
+function MaturityM3({ rel }: { rel: RelatorioData }) {
+  const totalCalib = rel.totalCalibracoes.aprovadas + rel.totalCalibracoes.reprovadas
+  const taxaAprov = totalCalib > 0 ? (rel.totalCalibracoes.aprovadas / totalCalib) * 100 : 0
+
+  // Normalizar cada KPI para escala 0-1
+  const nCheckLoop = Math.min(rel.checkLoopPercent / 100, 1)
+  const nMtbf = Math.min(rel.mtbfAlta / 500, 1) // 500h = referência ótima
+  const nOsPlan = Math.min(rel.osPlanejadasPercent / 100, 1)
+  const nCalib = Math.min(taxaAprov / 100, 1)
+
+  // Maturidade atual: média ponderada → escala 1-5
+  const score = 1 + ((nCheckLoop * 0.3 + nMtbf * 0.2 + nOsPlan * 0.25 + nCalib * 0.25) * 4)
+  const maturidadeAtual = Math.round(score * 100) / 100
+  const progressWidth = ((maturidadeAtual - 1) / 4) * 100
+
+  return (
+    <div className="rounded-xl border border-slate-700/50 p-5" style={{ background: 'hsl(222 47% 11%)' }}>
+      <h3 className="text-sm font-semibold text-white mb-4">Maturidade M3 — Calculada dos KPIs</h3>
+      <div className="flex items-center justify-between">
+        <div className="text-center">
+          <p className="text-3xl font-bold text-slate-400">1,00</p>
+          <p className="text-xs text-slate-500 mt-1">Base</p>
+        </div>
+        <div className="flex-1 mx-6">
+          <div className="h-3 rounded-full bg-slate-700 relative overflow-hidden">
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-red-500 via-yellow-500 via-emerald-500 to-cyan-500"
+              style={{ width: `${Math.max(0, Math.min(100, progressWidth))}%` }}
+            />
+          </div>
+          <div className="flex justify-between mt-1 text-[10px] text-slate-500">
+            <span>Reativo</span><span>Preventivo</span><span>Orientado</span><span>Digital</span><span>Excel.</span>
+          </div>
+        </div>
+        <div className="text-center">
+          <p className={cn('text-3xl font-bold', maturidadeAtual >= 3 ? 'text-emerald-400' : maturidadeAtual >= 2 ? 'text-yellow-400' : 'text-red-400')}>
+            {maturidadeAtual.toFixed(2).replace('.', ',')}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">Atual</p>
+        </div>
       </div>
     </div>
   )
