@@ -32,14 +32,16 @@ interface SidebarProps {
   }
 }
 
+// Papéis que podem ver cada item do menu
+// undefined = todos podem ver
 const menuItems = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'Equipamentos', href: '/equipamentos', icon: Wrench },
-  { label: 'Calibrações', href: '/calibracoes', icon: Gauge },
+  { label: 'Equipamentos', href: '/equipamentos', icon: Wrench, papeis: ['super_admin', 'admin', 'gestor'] },
+  { label: 'Calibrações', href: '/calibracoes', icon: Gauge, papeis: ['super_admin', 'admin', 'gestor'] },
   { label: 'Check Loop', href: '/check-loop', icon: ClipboardCheck },
-  { label: 'Ordens de Serviço', href: '/ordens-servico', icon: FileText },
-  { label: 'Relatórios', href: '/relatorios', icon: BarChart3 },
-  { label: 'Fluxogramas', href: '/fluxogramas', icon: GitBranch },
+  { label: 'Ordens de Serviço', href: '/ordens-servico', icon: FileText, papeis: ['super_admin', 'admin', 'gestor'] },
+  { label: 'Relatórios', href: '/relatorios', icon: BarChart3, papeis: ['super_admin', 'admin', 'gestor'] },
+  { label: 'Fluxogramas', href: '/fluxogramas', icon: GitBranch, papeis: ['super_admin', 'admin', 'gestor'] },
 ]
 
 const cadastrosSubmenu = [
@@ -99,7 +101,7 @@ export function Sidebar({ user }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {menuItems.map((item) => (
+        {menuItems.filter(item => !item.papeis || item.papeis.includes(user.papel ?? '')).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -116,40 +118,44 @@ export function Sidebar({ user }: SidebarProps) {
           </Link>
         ))}
 
-        {/* Cadastros submenu */}
-        <button
-          onClick={() => setCadastrosOpen(!cadastrosOpen)}
-          className={cn(
-            'flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm transition-colors',
-            pathname.startsWith('/cadastros')
-              ? 'bg-emerald-600/20 text-emerald-400'
-              : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-          )}
-        >
-          <span className="flex items-center gap-3">
-            <Database className="w-4 h-4 shrink-0" />
-            Cadastros
-          </span>
-          {cadastrosOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </button>
-        {cadastrosOpen && (
-          <div className="ml-4 pl-3 border-l border-slate-700/50 space-y-0.5">
-            {cadastrosSubmenu.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  'block px-3 py-1.5 rounded text-xs transition-colors',
-                  isActive(item.href)
-                    ? 'text-emerald-400 bg-emerald-600/10'
-                    : 'text-slate-500 hover:text-slate-300'
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
+        {/* Cadastros submenu — só para admin/gestor */}
+        {['super_admin', 'admin', 'gestor'].includes(user.papel ?? '') && (
+          <>
+            <button
+              onClick={() => setCadastrosOpen(!cadastrosOpen)}
+              className={cn(
+                'flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm transition-colors',
+                pathname.startsWith('/cadastros')
+                  ? 'bg-emerald-600/20 text-emerald-400'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+              )}
+            >
+              <span className="flex items-center gap-3">
+                <Database className="w-4 h-4 shrink-0" />
+                Cadastros
+              </span>
+              {cadastrosOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </button>
+            {cadastrosOpen && (
+              <div className="ml-4 pl-3 border-l border-slate-700/50 space-y-0.5">
+                {cadastrosSubmenu.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className={cn(
+                      'block px-3 py-1.5 rounded text-xs transition-colors',
+                      isActive(item.href)
+                        ? 'text-emerald-400 bg-emerald-600/10'
+                        : 'text-slate-500 hover:text-slate-300'
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {/* Admin */}

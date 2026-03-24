@@ -29,7 +29,7 @@ services:
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_TRUST_HOST=true
     volumes:
-      - uploads:/app/public/uploads
+      - uploads:/app/uploads
     deploy:
       replicas: 1
       restart_policy:

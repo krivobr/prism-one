@@ -36,8 +36,8 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 
-# Criar diretório de uploads
-RUN mkdir -p public/uploads && chown -R nextjs:nodejs public/uploads
+# Criar diretório de uploads (fora de public, servido via API route)
+RUN mkdir -p uploads && chown -R nextjs:nodejs uploads
 
 USER nextjs
 
