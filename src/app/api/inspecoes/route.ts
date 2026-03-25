@@ -8,9 +8,21 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const equipamentoId = searchParams.get('equipamento') ? Number(searchParams.get('equipamento')) : undefined
+  const dataFiltro = searchParams.get('data')
+  const executanteFiltro = searchParams.get('executante')
 
   const where: any = { id_empresa: session.user.id_empresa }
   if (equipamentoId) where.id_equipamento = equipamentoId
+
+  if (dataFiltro) {
+    const inicio = new Date(`${dataFiltro}T00:00:00`)
+    const fim = new Date(`${dataFiltro}T23:59:59.999`)
+    where.data = { gte: inicio, lte: fim }
+  }
+
+  if (executanteFiltro === 'meu') {
+    where.id_executante = session.user.id
+  }
 
   const inspecoes = await prisma.pO_Inspecao.findMany({
     where,

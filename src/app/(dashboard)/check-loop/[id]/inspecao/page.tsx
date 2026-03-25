@@ -33,8 +33,8 @@ export default function RegistroInspecaoPage() {
   const [fotoNome, setFotoNome] = useState<string | null>(null)
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null)
 
-  // Compress image before upload
-  const compressImage = (file: File, maxWidth = 1200): Promise<Blob> => {
+  // Compress image before upload (max 300KB, JPEG only)
+  const compressImage = (file: File, maxWidth = 800): Promise<Blob> => {
     return new Promise((resolve) => {
       const img = document.createElement('img')
       const canvas = document.createElement('canvas')
@@ -50,7 +50,26 @@ export default function RegistroInspecaoPage() {
           canvas.height = height
           const ctx = canvas.getContext('2d')!
           ctx.drawImage(img, 0, 0, width, height)
-          canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.8)
+
+          const MAX_SIZE = 300 * 1024 // 300KB
+          let quality = 0.6
+
+          const tryCompress = () => {
+            canvas.toBlob(
+              (blob) => {
+                if (blob && blob.size > MAX_SIZE && quality > 0.2) {
+                  quality -= 0.1
+                  tryCompress()
+                } else {
+                  resolve(blob!)
+                }
+              },
+              'image/jpeg',
+              quality
+            )
+          }
+
+          tryCompress()
         }
         img.src = e.target?.result as string
       }
@@ -123,7 +142,7 @@ export default function RegistroInspecaoPage() {
 
       if (res.ok) {
         setSucesso(true)
-        setTimeout(() => router.push('/check-loop'), 1500)
+        setTimeout(() => router.push('/check-loop/minhas-inspecoes'), 1500)
       }
     } catch { /* ignore */ }
     setSalvando(false)

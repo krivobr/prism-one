@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, ClipboardCheck, TrendingDown } from 'lucide-react'
+import { ArrowLeft, ClipboardCheck, TrendingDown, MapPin, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -38,6 +38,10 @@ interface Inspecao {
   status: string
   desvio_percentual: number | null
   observacoes: string | null
+  foto_url: string | null
+  latitude: number | null
+  longitude: number | null
+  diagnostico_hart: boolean | null
   executante: { nome: string } | null
 }
 
@@ -47,6 +51,7 @@ export default function DetalheInstrumentoPage() {
   const [equipamento, setEquipamento] = useState<Equipamento | null>(null)
   const [inspecoes, setInspecoes] = useState<Inspecao[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [fotoModal, setFotoModal] = useState<Inspecao | null>(null)
 
   useEffect(() => {
     async function carregar() {
@@ -169,12 +174,38 @@ export default function DetalheInstrumentoPage() {
           <h3 className="text-sm font-semibold text-white mb-3">Últimas Inspeções</h3>
           <div className="space-y-2">
             {inspecoes.slice(0, 10).map(insp => (
-              <div key={insp.id} className="flex items-center justify-between py-2 border-b border-slate-700/30 last:border-0">
-                <div>
-                  <p className="text-sm text-white">{formatDate(insp.data)}</p>
-                  <p className="text-xs text-slate-500">{insp.executante?.nome || '—'}</p>
+              <div key={insp.id} className="flex items-center gap-3 py-2 border-b border-slate-700/30 last:border-0">
+                {/* Thumbnail */}
+                {insp.foto_url ? (
+                  <button
+                    onClick={() => setFotoModal(insp)}
+                    className="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden border border-slate-600 hover:border-emerald-500 transition"
+                  >
+                    <img src={insp.foto_url} alt="Foto" className="w-full h-full object-cover" />
+                  </button>
+                ) : (
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-slate-700/50 border border-slate-700" />
+                )}
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-white">{formatDate(insp.data)}</p>
+                    <p className="text-xs text-slate-500">{insp.executante?.nome || '—'}</p>
+                  </div>
+                  {insp.observacoes && (
+                    <p className="text-xs text-slate-400 truncate mt-0.5">{insp.observacoes}</p>
+                  )}
+                  {insp.latitude != null && insp.longitude != null && (
+                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3 h-3" />
+                      {Number(insp.latitude).toFixed(5)}, {Number(insp.longitude).toFixed(5)}
+                    </p>
+                  )}
                 </div>
-                <div className="text-right">
+
+                {/* Status */}
+                <div className="text-right flex-shrink-0">
                   {insp.leitura != null && <p className="text-sm text-slate-300">{insp.leitura}</p>}
                   <span className={cn('text-xs px-2 py-0.5 rounded-full',
                     insp.status === 'OK' ? 'bg-emerald-600/20 text-emerald-400' :
@@ -184,6 +215,49 @@ export default function DetalheInstrumentoPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de foto fullscreen */}
+      {fotoModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setFotoModal(null)}
+        >
+          <div
+            className="relative max-w-lg w-full rounded-2xl overflow-hidden border border-slate-700"
+            style={{ background: 'hsl(222 47% 11%)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setFotoModal(null)}
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Image */}
+            {fotoModal.foto_url && (
+              <img src={fotoModal.foto_url} alt="Foto da inspeção" className="w-full object-contain max-h-[60vh]" />
+            )}
+
+            {/* Details */}
+            <div className="p-4 space-y-2">
+              <p className="text-sm text-white font-medium">{formatDate(fotoModal.data)}</p>
+
+              {fotoModal.latitude != null && fotoModal.longitude != null && (
+                <p className="text-xs text-slate-400 flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                  {Number(fotoModal.latitude).toFixed(6)}, {Number(fotoModal.longitude).toFixed(6)}
+                </p>
+              )}
+
+              {fotoModal.observacoes && (
+                <p className="text-sm text-slate-300">{fotoModal.observacoes}</p>
+              )}
+            </div>
           </div>
         </div>
       )}
