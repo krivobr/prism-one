@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { getDefaultPermissoes } from '@/lib/permissoes'
 import {
   LayoutDashboard,
   Wrench,
@@ -21,6 +22,7 @@ import {
   Database,
   Users,
   Building2,
+  Shield,
   LogOut,
 } from 'lucide-react'
 import { signOut } from 'next-auth/react'
@@ -33,17 +35,16 @@ interface SidebarProps {
   }
 }
 
-// Papéis que podem ver cada item do menu
-// undefined = todos podem ver
+// Mapeamento de módulos para itens do menu
 const menuItems = [
-  { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'Equipamentos', href: '/equipamentos', icon: Wrench, papeis: ['super_admin', 'admin', 'gestor'] },
-  { label: 'Calibrações', href: '/calibracoes', icon: Gauge, papeis: ['super_admin', 'admin', 'gestor'] },
-  { label: 'Check Loop', href: '/check-loop', icon: ClipboardCheck },
-  { label: 'Minhas Inspeções', href: '/check-loop/minhas-inspecoes', icon: ClipboardList },
-  { label: 'Ordens de Serviço', href: '/ordens-servico', icon: FileText, papeis: ['super_admin', 'admin', 'gestor'] },
-  { label: 'Relatórios', href: '/relatorios', icon: BarChart3, papeis: ['super_admin', 'admin', 'gestor'] },
-  { label: 'Fluxogramas', href: '/fluxogramas', icon: GitBranch, papeis: ['super_admin', 'admin', 'gestor'] },
+  { label: 'Dashboard', href: '/', icon: LayoutDashboard, modulo: 'dashboard' },
+  { label: 'Equipamentos', href: '/equipamentos', icon: Wrench, modulo: 'equipamentos' },
+  { label: 'Calibrações', href: '/calibracoes', icon: Gauge, modulo: 'calibracoes' },
+  { label: 'Check Loop', href: '/check-loop', icon: ClipboardCheck, modulo: 'check-loop' },
+  { label: 'Minhas Inspeções', href: '/check-loop/minhas-inspecoes', icon: ClipboardList, modulo: 'minhas-inspecoes' },
+  { label: 'Ordens de Serviço', href: '/ordens-servico', icon: FileText, modulo: 'ordens-servico' },
+  { label: 'Relatórios', href: '/relatorios', icon: BarChart3, modulo: 'relatorios' },
+  { label: 'Fluxogramas', href: '/fluxogramas', icon: GitBranch, modulo: 'fluxogramas' },
 ]
 
 const cadastrosSubmenu = [
@@ -74,13 +75,27 @@ const cadastrosSubmenu = [
 const adminItems = [
   { label: 'Empresas', href: '/admin/empresas', icon: Building2 },
   { label: 'Usuários', href: '/admin/usuarios', icon: Users },
+  { label: 'Permissões', href: '/admin/permissoes', icon: Shield },
 ]
+
+type Perms = Record<string, { pode_ver: boolean; pode_editar: boolean }>
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [cadastrosOpen, setCadastrosOpen] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
+  const [perms, setPerms] = useState<Perms>(() => getDefaultPermissoes(user.papel ?? ''))
+
+  // Buscar permissões do banco
+  useEffect(() => {
+    fetch('/api/admin/permissoes?meu=true')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setPerms(data) })
+      .catch(() => { /* usa defaults */ })
+  }, [])
+
+  const podeVer = (modulo: string) => perms[modulo]?.pode_ver ?? false
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/'
@@ -103,7 +118,7 @@ export function Sidebar({ user }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {menuItems.filter(item => !item.papeis || item.papeis.includes(user.papel ?? '')).map((item) => (
+        {menuItems.filter(item => podeVer(item.modulo)).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -120,8 +135,8 @@ export function Sidebar({ user }: SidebarProps) {
           </Link>
         ))}
 
-        {/* Cadastros submenu — só para admin/gestor */}
-        {['super_admin', 'admin', 'gestor'].includes(user.papel ?? '') && (
+        {/* Cadastros submenu — controlado por permissão */}
+        {podeVer('cadastros') && (
           <>
             <button
               onClick={() => setCadastrosOpen(!cadastrosOpen)}
@@ -160,8 +175,8 @@ export function Sidebar({ user }: SidebarProps) {
           </>
         )}
 
-        {/* Admin */}
-        {(user.papel === 'admin' || user.papel === 'super_admin') && (
+        {/* Admin — controlado por permissão */}
+        {podeVer('admin') && (
           <>
             <button
               onClick={() => setAdminOpen(!adminOpen)}

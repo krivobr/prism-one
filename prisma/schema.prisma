@@ -55,6 +55,7 @@ model PO_Empresa {
   periodos      PO_Periodo[]
   fluxogramas   PO_Fluxograma[]
   fotos         PO_Foto[]
+  permissoes    PO_Permissao[]
 
   @@map("po_empresa")
 }
@@ -76,6 +77,24 @@ model PO_Usuario {
 
   @@index([id_empresa])
   @@map("po_usuario")
+}
+
+/// Permissões por papel/módulo — configurável pelo admin
+model PO_Permissao {
+  id            Int      @id @default(autoincrement())
+  id_empresa    Int
+  papel         String   @db.VarChar(30)  /// Papel: admin, gestor, tecnico, visualizador
+  modulo        String   @db.VarChar(50)  /// Módulo: dashboard, equipamentos, calibracoes, etc.
+  pode_ver      Boolean  @default(false)
+  pode_editar   Boolean  @default(false)
+  criado_em     DateTime @default(now())
+  atualizado_em DateTime @updatedAt
+
+  empresa       PO_Empresa @relation(fields: [id_empresa], references: [id])
+
+  @@unique([id_empresa, papel, modulo])
+  @@index([id_empresa])
+  @@map("po_permissao")
 }
 
 // ============================================================
